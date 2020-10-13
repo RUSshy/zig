@@ -39,6 +39,8 @@ pub const RunStep = struct {
 
     expected_exit_code: u8 = 0,
 
+    print_command: bool = false,
+
     pub const StdIoAction = union(enum) {
         inherit,
         ignore,
@@ -223,17 +225,35 @@ pub const RunStep = struct {
         switch (term) {
             .Exited => |code| {
                 if (code != self.expected_exit_code) {
-                    warn("The following command exited with error code {} (expected {}):\n", .{
-                        code,
-                        self.expected_exit_code,
-                    });
-                    printCmd(cwd, argv);
+
+                    if(self.print_command)
+                    {
+                        warn("The following command exited with error code {} (expected {}):\n", .{
+                            code,
+                            self.expected_exit_code,
+                        });
+                        printCmd(cwd, argv);
+                    }
+                    else
+                    {
+                        warn("The command exited with error code {} (expected {})\n", .{
+                            code,
+                            self.expected_exit_code,
+                        });
+                    }
                     return error.UncleanExit;
                 }
             },
             else => {
-                warn("The following command terminated unexpectedly:\n", .{});
-                printCmd(cwd, argv);
+                if(self.print_command)
+                {
+                    warn("The following command terminated unexpectedly:\n", .{});
+                    printCmd(cwd, argv);
+                }
+                else
+                {
+                    warn("The command terminated unexpectedly\n", .{});
+                }
                 return error.UncleanExit;
             },
         }
@@ -250,7 +270,9 @@ pub const RunStep = struct {
                         \\{}
                         \\
                     , .{ expected_bytes, stderr.? });
-                    printCmd(cwd, argv);
+
+                    if(self.print_command)
+                        printCmd(cwd, argv);
                     return error.TestFailed;
                 }
             },
@@ -264,7 +286,8 @@ pub const RunStep = struct {
                         \\{}
                         \\
                     , .{ match, stderr.? });
-                    printCmd(cwd, argv);
+                    if(self.print_command)
+                        printCmd(cwd, argv);
                     return error.TestFailed;
                 }
             },
@@ -282,7 +305,8 @@ pub const RunStep = struct {
                         \\{}
                         \\
                     , .{ expected_bytes, stdout.? });
-                    printCmd(cwd, argv);
+                    if(self.print_command)
+                        printCmd(cwd, argv);
                     return error.TestFailed;
                 }
             },
@@ -296,7 +320,8 @@ pub const RunStep = struct {
                         \\{}
                         \\
                     , .{ match, stdout.? });
-                    printCmd(cwd, argv);
+                    if(self.print_command)
+                        printCmd(cwd, argv);
                     return error.TestFailed;
                 }
             },
@@ -304,11 +329,11 @@ pub const RunStep = struct {
     }
 
     fn printCmd(cwd: ?[]const u8, argv: []const []const u8) void {
-        if (cwd) |yes_cwd| warn("cd {} && ", .{yes_cwd});
-        for (argv) |arg| {
-            warn("{} ", .{arg});
-        }
-        warn("\n", .{});
+       if (cwd) |yes_cwd| warn("cd {} && ", .{yes_cwd});
+       for (argv) |arg| {
+           warn("{} ", .{arg});
+       }
+       warn("\n", .{});
     }
 
     fn addPathForDynLibs(self: *RunStep, artifact: *LibExeObjStep) void {
